@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>二维码扫描登录</title>
+</head>
+<body>
+            <h1>~~~~测试二维码生成~~~~</h1>
+            <div class="qrCodeImg-box" id="qrImgDiv"></div>
+</body>
+<script type="text/javascript" src="../qrcode/js/jquery.js"></script>
+<!--拿到请求中 header中放置的uuid 通过xmlhttp进行处理-->
+<script type="text/javascript">
+    $(document).ready(function(){
+        initQrImg();
+    });
+
+    //本地启动:ip + port
+    var path = "://localhost:8080";
+    var getQrPath =  "http" + path + "/qrCode/getLoginQr";
+    var getUserInfoPath="http"+path+"/qrCode/bindUserIdAndToken"
+    var wsPath =     "ws" + path + "/websocket/";
+
+    /*加载二维码图片*/
+    function initQrImg(){
+        $("#qrImgDiv").empty();
+        var xmlhttp=new XMLHttpRequest();
+        xmlhttp.open("GET",getQrPath,true);
+        xmlhttp.responseType = "blob";
+       /* xmlhttp.setRequestHeader("header",{'Content-Type': 'application/json',
+            "Access-Control-Allow-Origin": "*",
+            'Accept': 'application/json'})*/
+        xmlhttp.onload = function(){
+            console.log(this);
+            uuid = this.getResponseHeader("uuid");
+            token=this.getResponseHeader("token");
+            console.log("uuid:"+uuid);
+            if (this.status == 200) {
+                var blob = this.response;
+                var img = document.createElement("img");
+                img.className = 'qrCodeBox-img';
+                img.onload = function(e) {
+                    window.URL.revokeObjectURL(img.src);
+                };
+                img.src = window.URL.createObjectURL(blob);
+                document.getElementById("qrImgDiv").appendChild(img);
+                initWebSocket();
+            }
+        }
+        xmlhttp.send();
+    }
+
+    function initWebSocket(){
+        if(typeof(WebSocket) == "undefined") {
+            console.log("您的浏览器不支持WebSocket");
+        }else{
+            console.log("您的浏览器支持WebSocket");
+            //实现化WebSocket对象，指定要连接的服务器地址与端口  建立连接
+            var wsPathStr = wsPath+uuid;
+            console.log("wsPathStr:"+wsPathStr);
+            socket = new WebSocket(wsPathStr);
+            //打开事件
+            socket.onopen = function() {
+                console.log("Socket 已打开");
+                $.ajax({
+                    url:getUserInfoPath,
+                    data:{
+                        "token":token,//token根据项目来，我这里只是为了项目能运行成功固定值的
+                        "userId":uuid
+                    },
+                    dataType: 'jsonp',
+                    <!--如果jsonp中的参数不指定，则默认的是callback，即后台参数需要指定为callback，如果jsonp中指定参数，则jsonp中的参数需要和后台参数保持一致，就相当于安全认证，参数一致表示允许跨域请求接口-->
+                    jsonp: "callback1",
+                    method:"get",
+                    success:function(data){
+                        console.log("绑定的数据："+JSON.stringify(data));
+                        //客户端发送消息
+                        socket.send(JSON.stringify(data));
+                    },
+                    error:function(){
+                        alert("发送失败");
+                    }
+                })
+
+            };
+            //获得消息事件
+            socket.onmessage = function(msg) {
+                console.log(msg.data);
+                /*1 - 表示连接已建立，可以进行通信。msg.currentTarget.readyState == 1*/
+                var data = JSON.parse(msg.data);
+                if(data.code == 200){
+                    var b =confirm("是否跳转登录页面？");
+                    //处理业务的数据 sessionStorage：用于临时保存同一窗口(或标签页)的数据，在关闭窗口或标签页之后将会删除这些数据
+                    //想在浏览器窗口关闭后还保留数据，可以使用 localStorage 属性，需要手动删除
+                    window.sessionStorage.userId = data.userId;
+                    window.sessionStorage.projId = data.projId;
+                    if(b) {
+                        window.location.href = "../qrcode/login.html"
+                    }
+                }else{
+                    //如果过期了，关闭连接、重置连接、刷新二维码
+                    socket.close();
+                    initQrImg();
+                }
+                //发现消息进入    开始处理前端触发逻辑
+            };
+            //关闭事件
+            socket.onclose = function() {
+                console.log("Socket已关闭");
+            };
+            //发生了错误事件
+            socket.onerror = function() {
+                alert("Socket发生了错误");
+                //此时可以尝试刷新页面
+            }
+        }
+
+    }
+</script>
+</html>

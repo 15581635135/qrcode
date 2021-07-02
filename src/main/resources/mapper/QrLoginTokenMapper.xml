@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.qrcode.mapper.QrLoginTokenMapper">
+
+    <select id="selectOne" parameterType="com.cq.qrcode.entity.QrLoginToken" resultType="com.cq.qrcode.entity.QrLoginToken">
+            select * from qr_login_token where token=#{token}
+    </select>
+
+    <update id="updateById" parameterType="com.cq.qrcode.entity.QrLoginToken">
+            update qr_login_token set login_time=#{loginTime} where token=#{token} and user_id=#{userId}
+    </update>
+
+    <insert id="insert" parameterType="java.util.Map">
+        insert into qr_login_token (user_id,token) values(#{uuid},#{token})
+    </insert>
+</mapper>    
